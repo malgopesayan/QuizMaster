@@ -20,15 +20,19 @@ const TopicSelection = ({ pdfAnalysis, setCurrentQuiz }) => {
   const [filteredTopics, setFilteredTopics] = useState([]);
 
   useEffect(() => {
-    if (!pdfAnalysis?.topics) navigate('/');
-    setFilteredTopics(pdfAnalysis?.topics || []);
+    if (!pdfAnalysis?.topics) {
+      navigate('/');
+    } else {
+      setFilteredTopics(pdfAnalysis.topics);
+    }
   }, [pdfAnalysis, navigate]);
 
   useEffect(() => {
+    if (!pdfAnalysis?.topics) return;
     if (searchTerm.trim() === '') {
-      setFilteredTopics(pdfAnalysis?.topics || []);
+      setFilteredTopics(pdfAnalysis.topics);
     } else {
-      const filtered = (pdfAnalysis?.topics || []).filter(topic =>
+      const filtered = pdfAnalysis.topics.filter(topic =>
         topic.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         topic.description.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -37,7 +41,10 @@ const TopicSelection = ({ pdfAnalysis, setCurrentQuiz }) => {
   }, [searchTerm, pdfAnalysis?.topics]);
 
   const handleGenerateQuiz = async () => {
-    if (!selectedTopic) return alert('Please select a topic.');
+    if (!selectedTopic) {
+      alert('Please select a topic.');
+      return;
+    }
     setIsLoading(true);
     try {
       const wrongQuestions = JSON.parse(localStorage.getItem('quizmaster_wrong_questions') || '[]');
@@ -46,10 +53,11 @@ const TopicSelection = ({ pdfAnalysis, setCurrentQuiz }) => {
       
       let newQuestions = [];
       if (newQuestionCount > 0) {
+        // CORRECTED: Send uploadedFileName instead of the old geminiFileName
         const response = await axios.post('/api/generate-quiz', {
           topic: selectedTopic.title,
           questionCount: newQuestionCount,
-          geminiFileName: pdfAnalysis.geminiFileName,
+          uploadedFileName: pdfAnalysis.uploadedFileName,
         });
         newQuestions = response.data.quiz.questions;
       }
@@ -58,7 +66,8 @@ const TopicSelection = ({ pdfAnalysis, setCurrentQuiz }) => {
       setCurrentQuiz({ topic: selectedTopic.title, questions: finalQuizQuestions });
       navigate('/quiz');
     } catch (error) {
-      alert('Failed to generate quiz. Please check the server logs.');
+        const errorDetail = error.response?.data?.details || 'Please check the server logs.';
+        alert(`Failed to generate quiz. ${errorDetail}`);
     } finally {
       setIsLoading(false);
     }
@@ -77,7 +86,6 @@ const TopicSelection = ({ pdfAnalysis, setCurrentQuiz }) => {
           </div>
 
           <div className="quiz-builder">
-            {/* Topic Selection Section */}
             <div className="builder-section">
               <div className="section-header">
                 <div className="section-title">
@@ -122,15 +130,15 @@ const TopicSelection = ({ pdfAnalysis, setCurrentQuiz }) => {
                       onClick={() => setSelectedTopic(topic)}
                     >
                       <div className="topic-card-header">
-                        <div className="topic-radio">
                           <input
                             type="radio"
                             name="topic"
+                            className='topic-radio'
                             value={topic.title}
                             checked={selectedTopic?.title === topic.title}
                             onChange={() => setSelectedTopic(topic)}
+                            style={{width: '18px', height: '18px', cursor: 'pointer'}}
                           />
-                        </div>
                         <div className="topic-icon">
                           <i className="fas fa-book"></i>
                         </div>
@@ -156,7 +164,6 @@ const TopicSelection = ({ pdfAnalysis, setCurrentQuiz }) => {
               </div>
             </div>
 
-            {/* Quiz Settings Section */}
             <div className="builder-section">
               <div className="section-header">
                 <div className="section-title">
@@ -183,7 +190,6 @@ const TopicSelection = ({ pdfAnalysis, setCurrentQuiz }) => {
               </div>
             </div>
 
-            {/* Generate Button */}
             <div className="generate-section">
               <button 
                 className={`generate-btn ${selectedTopic ? 'ready' : 'disabled'}`}
