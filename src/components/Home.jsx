@@ -2,8 +2,6 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import axios from 'axios';
-import Modal from './Modal'; // Import the modal component
-import ProcessingModalContent from './ProcessingModalContent'; // Import the modal's content
 
 const Home = ({ setPdfAnalysis, pdfAnalysis }) => {
   const navigate = useNavigate();
@@ -29,65 +27,69 @@ const Home = ({ setPdfAnalysis, pdfAnalysis }) => {
     setUploadStage('Initializing...');
 
     try {
+      // Stage 1: File validation and preparation
       setUploadStage('Validating PDF file...');
       setUploadProgress(5);
       await new Promise(resolve => setTimeout(resolve, 300));
 
+      // Stage 2: Upload to server
       setUploadStage('Uploading to server...');
       setUploadProgress(10);
+      
       const formData = new FormData();
       formData.append('pdf', file);
 
-      setUploadStage('Server processing file...');
-      setUploadProgress(20);
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      setUploadStage('Uploading to AI service...');
-      setUploadProgress(35);
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      setUploadStage('AI analyzing document...');
-      setUploadProgress(50);
-
-      const response = await axios.post('/api/upload-and-analyze', formData, {
+      // Stage 3 & 4: Server processing and Upload to AI (combined perception)
+      setUploadStage('Sending to AI service...');
+      const response = await axios.post('http://localhost:5000/api/upload-and-analyze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
-            const uploadPercent = Math.round((progressEvent.loaded * 15) / progressEvent.total);
-            setUploadProgress(35 + uploadPercent);
+            // This progress is just the upload TO YOUR backend. Let's map it from 10% to 50%.
+            const uploadPercent = Math.round((progressEvent.loaded * 40) / progressEvent.total);
+            setUploadProgress(10 + uploadPercent);
           }
         },
       });
 
-      setUploadStage('Processing results...');
-      setUploadProgress(85);
-      await new Promise(resolve => setTimeout(resolve, 600));
-
-      setUploadStage('Finalizing analysis...');
-      setUploadProgress(95);
-      await new Promise(resolve => setTimeout(resolve, 400));
+      // Stage 5: AI is now analyzing (backend is waiting)
+      setUploadStage('AI is analyzing document...');
+      setUploadProgress(60); // Jump progress to show a new stage has begun
 
       if (response.data.success) {
+        // Stage 6: Processing results
+        setUploadStage('Processing results...');
+        setUploadProgress(85);
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        // Save the analysis data from the backend
         setPdfAnalysis({
           topics: response.data.topics,
           uploadedFileName: response.data.uploadedFileName,
         });
         
+        // Stage 7: Complete
         setUploadStage('Analysis complete!');
         setUploadProgress(100);
         await new Promise(resolve => setTimeout(resolve, 800));
         
         showToast(`PDF analyzed! Found ${response.data.topics.length} topics.`, 'success');
         navigate('/topics');
+      } else {
+        // Handle server-side errors that don't crash the request
+        throw new Error(response.data.error || 'Analysis failed on the server.');
       }
     } catch (error) {
       console.error('Upload error:', error);
-      const errorDetail = error.response?.data?.details || 'An unknown error occurred.';
+      const errorDetail = error.response?.data?.details || error.message || 'An unknown error occurred.';
       showToast(`Failed to analyze PDF: ${errorDetail}`, 'error');
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
       setUploadStage('');
+      if(fileInputRef.current) {
+        fileInputRef.current.value = ""; // Reset file input
+      }
     }
   };
 
@@ -128,10 +130,54 @@ const Home = ({ setPdfAnalysis, pdfAnalysis }) => {
                 <div className="icon icon-lg icon-purple mx-auto mb-4"><i className="fas fa-cloud-upload-alt"></i></div>
                 <h2 className="title mb-2 text-purple">Upload & Analyze PDF</h2>
                 <p className="text-gray-600 mb-6">Let our AI read your PDF and generate topics automatically.</p>
-                {/* The button is now always visible, but disabled during upload */}
-                <button className="btn btn-primary btn-lg" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-                  <i className="fas fa-upload"></i> Choose PDF File
-                </button>
+                {isUploading ? (
+                  <div className="upload-progress-container">
+                    <div className="upload-progress-header">
+                      <div className="upload-spinner">
+                        <div className="spinner-ring"></div>
+                      </div>
+                      <h3 className="upload-title">Processing Your PDF</h3>
+                      <p className="upload-stage">{uploadStage}</p>
+                    </div>
+                    
+                    <div className="progress-bar-container">
+                      <div className="progress-bar">
+                        <div 
+                          className="progress-fill" 
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                      <div className="progress-text">{Math.round(uploadProgress)}%</div>
+                    </div>
+                    
+                    <div className="upload-steps">
+                      <div className={`step ${uploadProgress >= 5 ? 'active' : ''}`}>
+                        <div className="step-icon">📄</div>
+                        <span>Validate</span>
+                      </div>
+                      <div className={`step ${uploadProgress >= 10 ? 'active' : ''}`}>
+                        <div className="step-icon">📤</div>
+                        <span>Upload</span>
+                      </div>
+                      <div className={`step ${uploadProgress >= 50 ? 'active' : ''}`}>
+                        <div className="step-icon">🤖</div>
+                        <span>AI Analysis</span>
+                      </div>
+                      <div className={`step ${uploadProgress >= 85 ? 'active' : ''}`}>
+                        <div className="step-icon">📋</div>
+                        <span>Finalize</span>
+                      </div>
+                      <div className={`step ${uploadProgress === 100 ? 'active' : ''}`}>
+                        <div className="step-icon">✅</div>
+                        <span>Complete</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="btn btn-primary btn-lg" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                    <i className="fas fa-upload"></i> Choose PDF File
+                  </button>
+                )}
               </div>
             </div>
 
@@ -148,15 +194,6 @@ const Home = ({ setPdfAnalysis, pdfAnalysis }) => {
           </div>
         </div>
       </main>
-      
-      {/* This renders the modal ONLY when 'isUploading' is true */}
-      <Modal isOpen={isUploading}>
-        <ProcessingModalContent 
-          uploadStage={uploadStage} 
-          uploadProgress={uploadProgress} 
-        />
-      </Modal>
-
       <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleFileSelect} style={{ display: 'none' }} />
       {toast && (
         <div className="toast-container">

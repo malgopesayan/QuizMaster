@@ -2,16 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from './Navbar';
 import axios from 'axios';
-import PerformanceChart from './PerformanceChart';
-import ReactMarkdown from 'react-markdown'; // <-- 1. IMPORT THE NEW LIBRARY
 
-// AI Tutor Analysis Component
+// Enhanced Weak Area Analysis Component - NOW POWERED BY CLAUDE
 const WeakAreaAnalysis = ({ wrongQuestionsFromQuiz }) => {
   const [analysis, setAnalysis] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchAnalysis = async () => {
+      // Use wrong questions from the current quiz if available
       if (wrongQuestionsFromQuiz.length === 0) {
         setAnalysis("Excellent job! You didn't get any questions wrong in this quiz.");
         setLoading(false);
@@ -20,6 +19,7 @@ const WeakAreaAnalysis = ({ wrongQuestionsFromQuiz }) => {
       
       try {
         setLoading(true);
+        // Call the new backend endpoint
         const response = await axios.post('/api/analyze-weak-areas', {
           wrongAnswers: wrongQuestionsFromQuiz
         });
@@ -31,6 +31,7 @@ const WeakAreaAnalysis = ({ wrongQuestionsFromQuiz }) => {
         setLoading(false);
       }
     };
+
     fetchAnalysis();
   }, [wrongQuestionsFromQuiz]);
 
@@ -46,10 +47,7 @@ const WeakAreaAnalysis = ({ wrongQuestionsFromQuiz }) => {
           <p>Claude is analyzing your results...</p>
         </div>
       ) : (
-        // --- 2. REPLACE THE <p> TAG WITH THE <ReactMarkdown> COMPONENT ---
-        <div className="analysis-text">
-          <ReactMarkdown>{analysis}</ReactMarkdown>
-        </div>
+        <p className="analysis-text" style={{ whiteSpace: 'pre-wrap' }}>{analysis}</p>
       )}
     </div>
   );
@@ -64,10 +62,10 @@ const Results = ({ quizResults }) => {
     const correctCount = quizResults.questions.filter(q => q.isCorrect).length;
     const totalCount = quizResults.questions.length;
     const incorrectCount = totalCount - correctCount;
-    const percent = totalCount > 0 ? Math.round((correctCount / totalCount) * 100) : 0;
+    const percent = Math.round((correctCount / totalCount) * 100);
     const wrongQuestions = quizResults.questions
       .filter(q => !q.isCorrect)
-      .map(q => ({
+      .map(q => ({ // Send a clean object to the AI
           topic: quizResults.topic,
           question: q.question,
           yourAnswer: q.options[q.userAnswer],
@@ -85,6 +83,7 @@ const Results = ({ quizResults }) => {
   }, [quizResults]);
 
   useEffect(() => {
+    // This effect handles saving wrong answers to localStorage for the Settings page
     if (!quizResults || !questions || !topic) return;
     
     const newWrongQuestions = questions
@@ -117,6 +116,7 @@ const Results = ({ quizResults }) => {
           </div>
 
           <div className="results-grid">
+            {/* Score Card */}
             <div className="score-card">
                  <div className="score-circle">
                     <div className="score-percentage" style={{ 
@@ -133,13 +133,16 @@ const Results = ({ quizResults }) => {
                 </div>
             </div>
 
-            <div className="performance-card">
-              <PerformanceChart newResult={{ topic, percentage }} />
+            {/* Performance Message */}
+            <div className="performance-message">
+              {/* ... existing message logic ... */}
             </div>
           </div>
           
+          {/* Weak Area Analysis - Now powered by the new component */}
           <WeakAreaAnalysis wrongQuestionsFromQuiz={wrongQuestionsFromQuiz} />
 
+          {/* Action Buttons */}
           <div className="results-actions">
             <button onClick={() => navigate('/')} className="action-btn primary"><i className="fas fa-plus"></i> Start New Quiz</button>
             <button onClick={() => navigate('/topics')} className="action-btn secondary"><i className="fas fa-redo"></i> Retry This Topic</button>
